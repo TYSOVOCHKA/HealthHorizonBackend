@@ -1,6 +1,7 @@
 import sqlite3
 from flask import Flask, request, jsonify
 from src.ai_api import ai_main
+from src.get_statystics import get_user_statystics
 import bcrypt
 
 
@@ -57,9 +58,12 @@ init_db()
 def get_hashed_password(plain_text_password):
     byte_password = plain_text_password.encode('utf-8')
     hashed_password = bcrypt.hashpw(byte_password, bcrypt.gensalt())
-    return hashed_password.decode('utf-8')
+    return hashed_password
 
 def check_password(plain_text_password, hashed_password):
+    if isinstance(hashed_password, str):
+        hashed_password = hashed_password.encode('utf-8')
+
     byte_password = plain_text_password.encode('utf-8')
     return bcrypt.checkpw(byte_password, hashed_password)
 
@@ -258,11 +262,13 @@ async def get_statystics():
     for attr in required_attributes:
         if attr not in data:
             return jsonify({"error": f"{attr} is required!"}), 400
+    login = data.get("login")
+    user_statystics: dict = get_user_statystics(login)
+    if user_statystics is None:
+        return jsonify({"error": "create profile or insert it!"}), 400
+    return jsonify(user_statystics), 200
     
-
-
-
-
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
     #app.run(debug=True)

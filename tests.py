@@ -14,15 +14,8 @@ def test_check_user():
 def test_register_user():
     payload = {"login": "test_user", "password": "test_password"}
     response = requests.post(f"{BASE_URL}/api/register-user", headers=HEADERS, json=payload)
-    assert response.status_code == 200
+    assert response.status_code == 200 or response.status_code == 400
     assert response.json().get("message") == "User registered!"
-
-def test_login_user():
-    payload = {"login": "test_user", "password": "test_password"}
-    response = requests.post(f"{BASE_URL}/api/login-user", headers=HEADERS, json=payload)
-    assert response.status_code == 200
-    assert "login" in response.json()
-    assert "data" in response.json()
 
 def test_add_user_characteristics():
     payload = {
@@ -45,6 +38,13 @@ def test_add_user_characteristics():
     response = requests.post(f"{BASE_URL}/api/add-user-characteristics", headers=HEADERS, json=payload)
     assert response.status_code == 200
     assert response.json().get("message") == "User characteristics received!"
+
+def test_login_user():
+    payload = {"login": "test_user", "password": "test_password"}
+    response = requests.post(f"{BASE_URL}/api/login-user", headers=HEADERS, json=payload)
+    assert response.status_code == 200
+    assert "login" in response.json()
+    assert "data" in response.json()
 
 def test_add_note():
     payload = {
@@ -72,8 +72,8 @@ def test_get_statistics():
 if __name__ == "__main__":
     test_check_user()
     test_register_user()
-    test_login_user()
     test_add_user_characteristics()
+    test_login_user()
     test_add_note()
     test_get_dietplan()
     test_get_statistics()

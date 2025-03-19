@@ -150,4 +150,24 @@ Generates a diet plan for the user based on their characteristics.
 
 ### `/api/get-statystics` [POST]
 
+Checks users statystics.
+**Request:**
+```json
+{
+    "login": "example_login"
+}
+```
+
+**Response:**
+```json
+{
+    "feels": "int",
+    "cost": "int",
+    "weight": "int",
+    "water": "int",
+    "created_at": "str",
+}
+```
+
+
 (Endpoint description and functionality not provided in the original code)
