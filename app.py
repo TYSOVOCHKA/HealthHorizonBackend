@@ -1,7 +1,8 @@
 import sqlite3
 from flask import Flask, request, jsonify
-from src.ai_api import ai_main
-from src.get_statystics import get_user_statystics
+from src.network_service import ai_main
+from src.statistics_service import get_user_statystics
+from src.user_service import UserService
 import bcrypt
 
 
@@ -50,53 +51,11 @@ def init_db() -> None:
     )
     """)
     conn.commit()
-    conn.close()
+    return conn
 
-init_db()
+conn = init_db()
 
-
-def get_hashed_password(plain_text_password):
-    byte_password = plain_text_password.encode('utf-8')
-    hashed_password = bcrypt.hashpw(byte_password, bcrypt.gensalt())
-    return hashed_password
-
-def check_password(plain_text_password, hashed_password):
-    if isinstance(hashed_password, str):
-        hashed_password = hashed_password.encode('utf-8')
-
-    byte_password = plain_text_password.encode('utf-8')
-    return bcrypt.checkpw(byte_password, hashed_password)
-
-def login_exist(login: str) -> bool:
-    conn = sqlite3.connect('users_data.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT 1 FROM users WHERE login = ?', (login,))
-    return True if cursor.fetchone() is not None else False
-
-def get_user_data(login: str) -> dict:
-    conn = sqlite3.connect('users_data.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users_characteristics WHERE login = ?', (login,))
-    user_data = cursor.fetchone()
-    conn.close()
-    if user_data is not None:
-        return {
-            "height": user_data[1],
-            "weight": user_data[2],
-            "gender": user_data[3],
-            "location": user_data[4],
-            "activities": user_data[5],
-            "diseases": user_data[6],
-            "cooking_time": user_data[7],
-            "goal": user_data[8],
-            "budget": user_data[9],
-            "food_preferences": user_data[10],
-            "allergies": user_data[11],
-            "supplements": user_data[12],
-            "lifestyle": user_data[13],
-            "workout_schedule": user_data[14]
-        }
-    return None
+user_service = UserService(conn)
 
 
 @app.route("/api/check-user", methods=['POST'])
@@ -106,7 +65,7 @@ def check_user():
     for attr in required_attributes:
         if attr not in data:
             return jsonify({"error": f"{attr} is required!"}), 400
-    return jsonify({"message": str(login_exist(data.get("login")))}), 200
+    return jsonify({"message": str(user_service.login_exist(data.get("login")))}), 200
 
 
 @app.route("/api/register-user", methods=['POST'])
@@ -120,17 +79,13 @@ def registration():
     login = data.get("login")
     password = data.get("password")
 
-    if login_exist(login):
+    if user_service.login_exist(login):
         return jsonify({"error": "Login already exist!"}), 400
     else:
-        conn = sqlite3.connect('users_data.db')
-        cursor = conn.cursor()
-
-        cursor.execute('INSERT INTO users (login, password) VALUES (?, ?)', (login, get_hashed_password(password)))
-        conn.commit()
-        conn.close()
-
-        return jsonify({"message": "User registered!"}), 200
+        if user_service.register_user(login, password):
+            return jsonify({"message": "User registered!"}), 200
+        else:
+            return jsonify({"message": "Fatal error"}), 400
     
 
 @app.route("/api/login-user", methods=['POST'])
@@ -148,14 +103,13 @@ def login():
     cursor = conn.cursor()
 
     cursor.execute('SELECT password FROM users WHERE login = ?', (login,))
-    user = cursor.fetchone()
-    conn.close()
+    user = cursor.fetchone()[0]
 
     if user is None:
         return jsonify({"error": "User not found!"}), 404
     else:
-        if check_password(password, user[0]):
-            user_data = get_user_data(login)
+        if user_service.check_password(password, user):
+            user_data = user_service.get_user_data(login)
             if user_data is None:
                 return jsonify({"error": "User profile not found!"}), 404
             return jsonify({"login": login, "data": user_data}), 200
@@ -189,20 +143,10 @@ async def add_user_characteristics():
     lifestyle = data.get("lifestyle")
     workout_schedule = data.get("workout_schedule")
 
-    if login_exist(login):
-        conn = sqlite3.connect('users_data.db')
-        cursor = conn.cursor()
-        cursor.execute("""
-        INSERT OR REPLACE INTO users_characteristics (
-            login, height, weight, gender, location, activities, diseases, 
-            cooking_time, goal, budget, food_preferences, allergies, 
-            supplements, lifestyle, workout_schedule)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, 
-            (login, height, weight, gender, location, activities, diseases, cooking_time, goal, budget, food_preferences, allergies, supplements, lifestyle, workout_schedule)) 
-        conn.commit()
-        conn.close()  
-    
+    characteristics = (login, height, weight, gender, location, activities, diseases, cooking_time, goal, budget, food_preferences, allergies, supplements, lifestyle, workout_schedule)
+
+    if user_service.login_exist(login):
+        user_service.add_user_characteristics(characteristics)
         return jsonify({"message": "User characteristics received!"}), 200
     else:
         return jsonify({"error": "User not found!"}), 404
@@ -222,18 +166,8 @@ async def add_user_note():
     weight = data.get("weight")
     water = data.get("water")
 
-    conn = sqlite3.connect('users_data.db')
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    INSERT OR REPLACE INTO users_note (
-        login, feels, cost, weight, water)
-    VALUES (?, ?, ?, ?, ?)
-    """, 
-        (login, feels, cost, weight, water)) 
-    conn.commit()
-    conn.close()  
-    
+    notes = (login, feels, cost, weight, water)
+    user_service.add_user_note(notes)
     return jsonify({"message": "User note received!"}), 200
 
 
@@ -245,8 +179,9 @@ async def get_diet_paln():
         if attr not in data:
             return jsonify({"error": f"{attr} is required!"}), 400
     
-    if login_exist(data.get("login")):
-        diet_plan = await ai_main(data.get("login"))
+    login = data.get("login")
+    if user_service.login_exist(login):
+        diet_plan = await ai_main(login)
         if diet_plan[1] == 200:
             return jsonify({"result": diet_plan[0]}), 200
         else:
@@ -255,7 +190,7 @@ async def get_diet_paln():
         return jsonify({"error": "User not found!"}), 404
     
 
-@app.route("/api/get-statystics", methods=['POST'])
+@app.route("/api/get-statistics", methods=['POST'])
 async def get_statystics():
     data = request.json
     required_attributes = ["login"]
