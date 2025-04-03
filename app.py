@@ -5,9 +5,7 @@ from src.statistics_service import get_user_statystics
 from src.user_service import UserService
 import bcrypt
 
-
 app = Flask(__name__)
-
 
 def init_db() -> None:
     conn = sqlite3.connect('users_data.db')
@@ -51,12 +49,13 @@ def init_db() -> None:
     )
     """)
     conn.commit()
+    conn.close()
+    
+init_db()
+
+def get_db_connection():
+    conn = sqlite3.connect('users_data.db')
     return conn
-
-conn = init_db()
-
-user_service = UserService(conn)
-
 
 @app.route("/api/check-user", methods=['POST'])
 def check_user():
@@ -65,8 +64,11 @@ def check_user():
     for attr in required_attributes:
         if attr not in data:
             return jsonify({"error": f"{attr} is required!"}), 400
-    return jsonify({"message": str(user_service.login_exist(data.get("login")))}), 200
-
+    conn = get_db_connection()
+    user_service = UserService(conn)
+    result = user_service.login_exist(data.get("login"))
+    conn.close()
+    return jsonify({"message": str(result)}), 200
 
 @app.route("/api/register-user", methods=['POST'])
 def registration():
@@ -79,12 +81,17 @@ def registration():
     login = data.get("login")
     password = data.get("password")
 
+    conn = get_db_connection()
+    user_service = UserService(conn)
     if user_service.login_exist(login):
+        conn.close()
         return jsonify({"error": "Login already exist!"}), 400
     else:
         if user_service.register_user(login, password):
+            conn.close()
             return jsonify({"message": "User registered!"}), 200
         else:
+            conn.close()
             return jsonify({"message": "Fatal error"}), 400
     
 
@@ -99,21 +106,25 @@ def login():
     login = data.get("login")
     password = data.get("password")
 
-    conn = sqlite3.connect('users_data.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute('SELECT password FROM users WHERE login = ?', (login,))
-    user = cursor.fetchone()[0]
+    user = cursor.fetchone()
 
     if user is None:
+        conn.close()
         return jsonify({"error": "User not found!"}), 404
     else:
-        if user_service.check_password(password, user):
+        user_service = UserService(conn)
+        if user_service.check_password(password, user[0]):
             user_data = user_service.get_user_data(login)
+            conn.close()
             if user_data is None:
                 return jsonify({"error": "User profile not found!"}), 404
             return jsonify({"login": login, "data": user_data}), 200
         else:
+            conn.close()
             return jsonify({"error": "Wrong password!"}), 400
 
 
@@ -145,10 +156,14 @@ async def add_user_characteristics():
 
     characteristics = (login, height, weight, gender, location, activities, diseases, cooking_time, goal, budget, food_preferences, allergies, supplements, lifestyle, workout_schedule)
 
+    conn = get_db_connection()
+    user_service = UserService(conn)
     if user_service.login_exist(login):
         user_service.add_user_characteristics(characteristics)
+        conn.close()
         return jsonify({"message": "User characteristics received!"}), 200
     else:
+        conn.close()
         return jsonify({"error": "User not found!"}), 404
 
 
@@ -167,7 +182,10 @@ async def add_user_note():
     water = data.get("water")
 
     notes = (login, feels, cost, weight, water)
+    conn = get_db_connection()
+    user_service = UserService(conn)
     user_service.add_user_note(notes)
+    conn.close()
     return jsonify({"message": "User note received!"}), 200
 
 
@@ -180,13 +198,17 @@ async def get_diet_paln():
             return jsonify({"error": f"{attr} is required!"}), 400
     
     login = data.get("login")
+    conn = get_db_connection()
+    user_service = UserService(conn)
     if user_service.login_exist(login):
+        conn.close()
         diet_plan = await ai_main(login)
         if diet_plan[1] == 200:
             return jsonify({"result": diet_plan[0]}), 200
         else:
             return jsonify({"message": "Problem with AI, try again"}), 500
     else:
+        conn.close()
         return jsonify({"error": "User not found!"}), 404
     
 
