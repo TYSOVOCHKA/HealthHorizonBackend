@@ -169,5 +169,35 @@ Checks users statystics.
 }
 ```
 
+### `/api/get-characteristics` [POST]
+
+Get users characteristics.
+**Request:**
+```json
+{
+    "login": "example_login"
+}
+```
+
+**Response:**
+```json
+{
+    "height": "int",
+    "weight": "int",
+    "gender": "str",
+    "location": "str",
+    "activities": "str",
+    "diseases": "str",
+    "cooking_time": "int",
+    "goal": "str",
+    "budget": "int",
+    "food_preferences": "str",
+    "allergies": "str",
+    "supplements": "int",
+    "lifestyle": "str",
+    "workout_schedule": "str"
+}
+```
+
 
 (Endpoint description and functionality not provided in the original code)

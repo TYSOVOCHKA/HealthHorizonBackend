@@ -70,6 +70,20 @@ def check_user():
     conn.close()
     return jsonify({"message": str(result)}), 200
 
+
+@app.route("/api/get-characteristics", methods=['POST'])
+def get_characteristics():
+    data = request.json
+    required_attributes = ["login"]
+    for attr in required_attributes:
+        if attr not in data:
+            return jsonify({"error": f"{attr} is required!"}), 400
+    conn = get_db_connection()
+    user_service = UserService(conn)
+    result = user_service.get_user_data(login)
+    return jsonify({"result": result})
+
+
 @app.route("/api/register-user", methods=['POST'])
 def registration():
     data = request.json
