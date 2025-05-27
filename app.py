@@ -78,6 +78,7 @@ def get_characteristics():
     for attr in required_attributes:
         if attr not in data:
             return jsonify({"error": f"{attr} is required!"}), 400
+    login = data.get("login")
     conn = get_db_connection()
     user_service = UserService(conn)
     result = user_service.get_user_data(login)
@@ -179,6 +180,31 @@ async def add_user_characteristics():
     else:
         conn.close()
         return jsonify({"error": "User not found!"}), 404
+
+
+@app.route("/api/update-characteristics", methods=['POST'])
+async def update_user_characteristics():
+    data = request.json
+    login = data.get("login")
+    user_service = UserService(conn)
+    required_attributes = ["login", "height", "weight", "gender", "location", "activities", "diseases",
+    "cooking_time", "goal", "budget", "food_preferences", "allergies", "supplements", "lifestyle", "workout_schedule"]
+    allow_attributes = []
+
+    for attr in required_attributes:
+        if attr in data:
+            info = data.get(attr)
+            allow_attributes.append(info)
+        else:
+            conn = get_db_connection()
+            info = user_service.get_attr_info(attr, login)
+            allow_attributes.append(info)
+    result = user_service.add_user_characteristics(tuple(allow_attributes))
+    if result:
+        conn.close()
+        return jsonify({"message": "User characteristics received!"}), 200
+    conn.close()
+    return jsonify({"error": "User not found!"}), 404
 
 
 @app.route("/api/add-note", methods=['POST'])

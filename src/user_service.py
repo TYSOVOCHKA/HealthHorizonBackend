@@ -69,6 +69,14 @@ class UserService:
         except Exception as error:
             print(error)
             return False
+        
+    
+    def get_attr_info(self, attr, login):
+        self.cursor.execute(f'SELECT {attr} from users_characteristics WHERE login = ?', (login,))
+        user_data = self.cursor.fetchone()
+        if user_data is not None:
+            return user_data[0]
+        return None
 
     def add_user_note(self, notes: tuple) -> bool:
         try:
